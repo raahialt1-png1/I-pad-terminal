@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Terminal App</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <style>
+        body, html {
+            margin: 0; padding: 0;
+            background: #000; height: 100%; overflow: hidden;
+        }
+        #terminal-container {
+            height: 100%; width: 100%;
+            padding: 10px; box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+<div id="terminal-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+<script>
+    // Initialize Xterm.js window with basic aesthetics
+    const term = new Terminal({
+        cursorBlink: true,
+        theme: { background: '#000000', foreground: '#00ff00' },
+        fontSize: 16,
+        fontFamily: 'Courier New, monospace'
+    });
+    
+    term.open(document.getElementById('terminal-container'));
+    term.writeln('Connecting to secure container cluster...');
+
+    // Open a WebSocket connection back to our node server
+    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const ws = new WebSocket(protocol + window.location.host);
+
+    ws.onopen = () => {
+        term.clear();
+        // Trigger initial return to force your custom C prompt to draw
+        ws.send('\n'); 
+    };
+
+    // When the backend replies, print it directly to the terminal screen
+    ws.onmessage = (event) => {
+        term.write(event.data);
+    };
+
+    // Buffer inputs so users see what they type before hitting Enter
+    let inputBuffer = '';
+    term.onData(data => {
+        if (data === '\r') { // Enter key
+            term.write('\r\n');
+            ws.send(inputBuffer + '\n');
+            inputBuffer = '';
+        } else if (data === '\u007F') { // Backspace
+            if (inputBuffer.length > 0) {
+                inputBuffer = inputBuffer.slice(0, -1);
+                term.write('\b \b'); // Visually erase character
+            }
+        } else {
+            inputBuffer += data;
+            term.write(data); // Echo character locally
+        }
+    });
+
+    ws.onclose = () => {
+        term.writeln('\r\n[Connection Closed]');
+    };
+</script>
+</body>
+</html>
